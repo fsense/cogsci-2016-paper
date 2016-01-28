@@ -1,0 +1,166 @@
+---
+title: 'Supplement: CogSci 2016 Paper'
+author: 'written by: [Florian Sense](f.sense@rug.nl)'
+date: "January 2016"
+output:
+  pdf_document:
+    toc: yes
+---
+
+
+# Abstract
+
+A PDF of the submitted paper is included in this repository.
+
+Abstract:
+
+> Adaptive fact learning systems have been developed to make optimal use of testing and spacing effects by taking into account individual differences in learning efficiency. Measures derived from these systems, capturing the individual differences, predict later performance in similar and different fact learning tasks. Additionally, there is a rich body of literature showing that individual differences in general cognitive ability or working memory capacity are predictive achievement tests. If these measures also influence fact learning, incorporating them might further enhance adaptive systems. However, here we show that performance during fact learning is neither related to working memory capacity nor general cognitive ability. This means that the individual differences captured by our adaptive learning system encapsulate characteristics of learners that are independent of their general cognitive ability. Consequently, adaptive learning methods should focus primarily on memory-related processes. 
+
+# The Data
+
+```{r}
+library(ggplot2)
+source("functions/print.correlation.R")
+source("functions/clean_graphs.R")
+data <- read.csv("data/data for cogsci paper.csv")
+head(data)
+length(unique(data$subject)) # number of participants
+```
+
+## Demographic Information
+
+A summary of the demographic information reported in the paper.
+
+```{r}
+demo <- read.csv("data/demographics.csv")
+colnames(demo) <- c("row", "timestamp", "subj", "yob", "gender", "native", "Swahili")
+levels(demo$gender) <- c("male", "female")
+demo$age <- 2015 - demo$yob
+```
+
+### Information about age
+
+```{r}
+median(demo$age)
+sd(demo$age)
+range(demo$age)
+
+hist(demo$age, main="Distribution of Participants' Age", xlab="", las=1)
+mtext(paste("N =", nrow(demo)))
+abline(v=median(demo$age), lwd=2, col="red") # indicate the median age on the plot
+```
+
+
+### Information about gender
+
+```{r}
+table(demo$gender)
+mean(demo$gender == "female") * 100 # percent female
+```
+
+
+
+## Data reported in Table 1
+
+Table 1 reports means, standard deviations, and the range for the three complex span tasks and their composite score. Also reported are the correlations.
+
+```{r}
+# Compute the composite score:
+data$wmc <- rowMeans(cbind(scale(data$ospan.total), 
+                           scale(data$rotspan.total), 
+                           scale(data$symspan.total)), na.rm = TRUE)
+
+tmp <- subset(data, 
+              select = c("ospan.total", "rotspan.total", "symspan.total", "wmc"))
+```
+
+Compute the summary statistics in Table 1:
+
+```{r}
+apply(tmp, 2, mean, na.rm=TRUE)
+apply(tmp, 2, sd, na.rm=TRUE)
+apply(tmp, 2, range, na.rm=TRUE)
+```
+
+Correlations among the three complex span tasks:
+
+```{r}
+print.correlation(tmp$ospan.total, tmp$rotspan.total, "OSpan", "RotSpan")
+print.correlation(tmp$ospan.total, tmp$symspan.total, "OSpan", "SymSpan")
+print.correlation(tmp$rotspan.total, tmp$symspan.total, "RotSpan", "SymSpan")
+```
+
+Correlations with the composite score:
+
+```{r}
+print.correlation(tmp$wmc, tmp$ospan.total, "WMC", "OSpan")
+print.correlation(tmp$wmc, tmp$rotspan.total, "WMC", "RotSpan")
+print.correlation(tmp$wmc, tmp$symspan.total, "WMC", "SymSpan")
+```
+
+All *p*-values for the correlations are below .05 and the corresponding Bayes factors are reported as well. The Bayes factors for the composite score (WMC) are ridiculously large. So large, in fact, that the numbers are not very meaningful which is why I reported them in the paper as "well over one billion". (They are, in fact, over 9 quadrillion!)
+
+We also report the correlation between the two test scores in the paper:
+
+```{r}
+print.correlation(data$test1, data$test2, "Test 1", "Test 2")
+```
+
+
+## Variation in estimated parameters
+
+The *rate of forgetting* is the mean parameter value across all items for each participant.
+
+```{r}
+param <- read.csv("data/parameters.csv")
+
+# Compute the rate of forgetting:
+rof <- aggregate(alpha ~ subj, param, mean)
+
+mean(rof$alpha)
+sd(rof$alpha)
+range(rof$alpha)
+
+perItem <- aggregate(alpha ~ item, param, mean)
+perItem <- cbind( perItem, sd = aggregate(alpha ~ item, param, sd)[, 2] )
+
+perSubj <- aggregate(alpha ~ subj, param, mean)
+perSubj <- cbind( perSubj, sd = aggregate(alpha ~ subj, param, sd)[, 2] )
+
+ggplot(perItem, aes(x=item, y=alpha)) + geom_errorbar(aes(ymin=alpha-sd, ymax=alpha+sd)) +
+  geom_point(size=3) + ggtitle("Variation Across Items")
+
+ggplot(perSubj, aes(x=subj, y=alpha)) + geom_errorbar(aes(ymin=alpha-sd, ymax=alpha+sd)) +
+  geom_point(size=3) + ggtitle("Variation Across Participants")
+```
+
+## Figure 1
+
+The figure is a bit bigger so I'll save it to a seperate file.
+
+```{r}
+pdf("Figure 1.pdf", 7, 7)
+subset <- cbind(data$alpha, data$test2, data$iq, data$wmc)
+colors <- rep("#90AFC5", ncol(subset))
+variables <- c("Rate of Forgetting", "Second Test", "GCA", "WMC")
+clean.overview(subset, variables, colors)
+dev.off()
+```
+
+As stated in the paper, these results are not very different if the test scores from the first test (instead of those from the second test) are used.
+
+```{r}
+pdf("Figure 1 with scores from first test.pdf", 7, 7)
+subset <- cbind(data$alpha, data$test1, data$iq, data$wmc)
+variables <- c("Rate of Forgetting", "First Test", "GCA", "WMC")
+clean.overview(subset, variables, colors)
+dev.off()
+```
+
+# Session Information
+
+Information regarding the version of R and all loaded packages when compiling this document.
+
+```{r}
+print(sessionInfo(), locale = FALSE)
+```
